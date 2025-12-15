@@ -3,7 +3,7 @@
 ## Inroduction
 This is a library help to run FFmpeg command. Encoder create EncodedVideoChunk/EncodedAudioChunk objects from piped output. The decode function help to convert EncodedVideoChunk/EncodedAudioChunk object to VideoFrame/AudioFrame objects.
 A Player class that help to play VideoFrame/AudioFrame into the UI.
-
+```
          │   FFmpeg command - array of strings
          ▼
 ┌─────────────────┐
@@ -19,7 +19,7 @@ A Player class that help to play VideoFrame/AudioFrame into the UI.
 ┌─────────────────┐
 │     Player      │
 └─────────────────┘
-
+```
 
 ## Requiments
 - NodeJS and FFmpeg executable(for desktop encoders)
