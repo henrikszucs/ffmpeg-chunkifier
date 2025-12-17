@@ -89,6 +89,7 @@ await audioEncoder.start(
 
 ### Decoder
 ```js
+const player = new Player(audioPlay=true, audioDrawCtx, videoDrawCtx);
 
 const decoder = new Decoder();
 decoder.onVideoFrame = (frame) => {
