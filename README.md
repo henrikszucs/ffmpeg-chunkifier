@@ -39,8 +39,8 @@ A Player class that help to play VideoFrame/AudioFrame into the UI.
 |--------|--------------|
 | H264   | MP4          |
 | H265   | MP4          |
-| VP8    | Ogg/WebM     |
-| VP9    | MP4/Ogg/WebM |
+| VP8    | WebM/Ogg     |
+| VP9    | MP4/WebM/Ogg |
 | AV1    | MP4/WebM     |
 
 ### Audio formats
@@ -48,8 +48,8 @@ A Player class that help to play VideoFrame/AudioFrame into the UI.
 | Codec  |  Containers  |
 |--------|--------------|
 | ACC    | MP4          |
-| MP3    | MP4/MP3/     |
-| Opus   | MP4/Ogg/WebM |
+| MP3    | MP4/MP3      |
+| Opus   | MP4/WebM/Ogg |
 
 
 ## Usage

@@ -78,6 +78,7 @@ const main = async () => {
         decoder.appendVideoConfiguration(config);
     };
     videoEncoderFFmpeg.onChunk = (chunk) => {
+        console.log("Video chunk:", chunk);
         decoder.appendVideoChunk(chunk);
     };
     videoEncoderFFmpeg.onEnd = (error) => {
@@ -149,7 +150,7 @@ const main = async () => {
     // Audio encoder - ffmpeg - webm
     document.getElementById("audioFFmpegWebMBtn").addEventListener("click", async function() {
         await stopAudio();
-        await audioEncoder.start(
+        await audioEncoderFFmpeg.start(
             ffmpegPath,
             [
                 // Input options - MUST come before -i
@@ -194,27 +195,73 @@ const main = async () => {
 
     document.getElementById("audioFFmpegOggBtn").addEventListener("click", async function() {
         await stopAudio();
+        await audioEncoderFFmpeg.start(
+            ffmpegPath,
+            [
+                // Input options - MUST come before -i
+                "-fflags", "+nobuffer+flush_packets",
+                "-flags", "+low_delay",
+                "-analyzeduration", "0",         // Don't analyze input
+                "-probesize", "32",              // Minimum probe size
+                "-thread_queue_size", "8",       // Small queue
+                "-audio_buffer_size", "10",      // 10ms audio buffer (dshow specific)
+                
+                "-f", "dshow",
+                "-i", "audio=\"Sztereó keverő (Realtek(R) Audio)\"",
+                
+                "-acodec", "libopus",
+                "-b:a", "128k",
+                "-ar", "48000",
+                "-ac", "2",
+                "-application", "lowdelay",
+                "-frame_duration", "10",
+                "-vbr", "off",
+                "-compression_level", "0",
+                "-packet_loss", "0",
+                
+                // Ogg muxer options
+                "-page_duration", "10000",      // 10ms page duration (in microseconds)
+                "-flush_packets", "1",
+                "-max_delay", "0",
+                "-muxdelay", "0",
+                "-f", "ogg",
+                "pipe:1"
+            ],
+            {
+                "codec": "opus",
+                "sampleRate": 48000,
+                "numberOfChannels": 2
+            }
+        );
     });
 
     document.getElementById("audioFFmpegMP3Btn").addEventListener("click", async function() {
         await stopAudio();
-        await audioEncoder.start(
+        await audioEncoderFFmpeg.start(
             ffmpegPath,
             [
-                //"-list_devices", "true", "-f", "dshow", "-i", "dummy"
+                // Input options - MUST come before -i
+                "-fflags", "+nobuffer+flush_packets",
+                "-flags", "+low_delay",
+                "-analyzeduration", "0",
+                "-probesize", "32",
+                "-thread_queue_size", "8",
+                "-audio_buffer_size", "10",
                 
                 "-f", "dshow",
                 "-i", "audio=\"Sztereó keverő (Realtek(R) Audio)\"",
-                "-acodec", "mp3",
-                "-b:a", "128k",
-                "-ar", "48000",
-                "-ac", "2",
+                
+                // Output options
+                "-acodec", "libmp3lame",
+                "-qscale:a", "4",
+                "-ar", "44100",
+                "-flush_packets", "1",
                 "-f", "mp3",
                 "pipe:1"
             ],
             {
-                "codec": "mp4a.40.2",
-                "sampleRate": 48000,
+                "codec": "mp3",
+                "sampleRate": 44100,
                 "numberOfChannels": 2
             }
         );
@@ -225,7 +272,7 @@ const main = async () => {
     //
     document.getElementById("videoFFmpegMP4Btn").addEventListener("click", async function() {
         await stopVideo();
-        await videoEncoder.start(
+        await videoEncoderFFmpeg.start(
             ffmpegPath,
             [
                 "-fflags", "+nobuffer+flush_packets",
@@ -271,11 +318,7 @@ const main = async () => {
 
     document.getElementById("videoFFmpegWebMBtn").addEventListener("click", async function() {
         await stopVideo();
-    });
-
-    document.getElementById("videoFFmpegOggBtn").addEventListener("click", async function() {
-        await stopVideo();
-        await videoEncoder.start(
+        await videoEncoderFFmpeg.start(
             ffmpegPath,
             [
                 "-fflags", "+nobuffer+flush_packets",
@@ -284,32 +327,124 @@ const main = async () => {
                 "-probesize", "32",              // Minimum probe size
                 "-thread_queue_size", "8",       // Small queue"
 
+                "-filter_complex",
+                "gfxcapture=monitor_idx=0" +
+                ":capture_cursor=false" +
+                ":max_framerate=60" +
+                ",hwdownload,format=bgra",
+                
+                // VP8 codec settings
+                "-c:v", "libvpx",
+                
+                // Real-time / low-latency settings
+                "-deadline", "realtime",           // Fastest encoding mode
+                "-cpu-used", "16",                 // Fastest preset (0-16 for VP8, higher = faster)
+                "-lag-in-frames", "0",             // No frame lookahead for minimal latency
+                "-error-resilient", "1",           // Enable error resilience for streaming
+                
+                // Rate control
+                "-b:v", "2M",                      // Target bitrate
+                "-maxrate", "2.5M",                // Maximum bitrate
+                "-minrate", "1M",                  // Minimum bitrate
+                "-bufsize", "500k",                // Small buffer for low latency
+                "-undershoot-pct", "95",           // Allow undershooting target
+                "-overshoot-pct", "100",           // Limit overshooting
+                
+                // Quality settings
+                "-qmin", "4",                      // Minimum quantizer (lower = better quality)
+                "-qmax", "48",                     // Maximum quantizer
+                "-crf", "10",                      // Constant rate factor (optional, 4-63)
+                
+                // Keyframe settings
+                "-g", "30",                        // Keyframe every 30 frames
+                "-keyint_min", "30",               // Minimum keyframe interval
+                "-auto-alt-ref", "0",              // Disable alt ref frames for low latency
+                
+                // Frame settings
+                "-r", "30",                        // Frame rate
+                "-pix_fmt", "yuv420p",             // Pixel format
+                
+                // WebM container settings
+                "-f", "webm",                      // Output format
+                "-cluster_size_limit", "2M",       // Limit cluster size
+                "-cluster_time_limit", "1000",     // Limit cluster duration
+                
+                // WebM container settings
+                "-f", "webm",
+                "pipe:1"
+            ],
+            {
+                "codec": "vp8",
+                "codedWidth": 1920,
+                "codedHeight": 1080,
+                "optimizeForLatency": true
+            }
+        );
+    });
+
+    document.getElementById("videoFFmpegOggBtn").addEventListener("click", async function() {
+        await stopVideo();
+        await videoEncoderFFmpeg.start(
+            ffmpegPath,
+            [
+                "-fflags", "+nobuffer+flush_packets",
+                "-flags", "+low_delay",
+                "-analyzeduration", "0",         // Don't analyze input
+                "-probesize", "32",              // Minimum probe size
+                "-thread_queue_size", "8",       // Small queue"
 
                 "-filter_complex",
                 "gfxcapture=monitor_idx=0" +
                 ":capture_cursor=false" +
                 ":max_framerate=60" +
                 ",hwdownload,format=bgra",
-                "-c:v", "libvpx",
-                "-b:v", "10000K",
-                "-pix_fmt", "yuva420p",
-                "-auto-alt-ref", "0",
                 
-                "-framerate", "60",
-                "-g", "30",             // Keyframe interval (every 30 frames = 0.5s at 60fps)
-                "-keyint_min", "30",
-                "-force_key_frames", "expr:gte(t,n_forced*0.5)",
+                // VP8 codec settings
+                "-c:v", "libvpx",
+                
+                // Real-time / low-latency settings
+                "-deadline", "realtime",           // Fastest encoding mode
+                "-cpu-used", "16",                 // Fastest preset (0-16 for VP8, higher = faster)
+                "-lag-in-frames", "0",             // No frame lookahead for minimal latency
+                "-error-resilient", "1",           // Enable error resilience for streaming
+                
+                // Rate control
+                "-b:v", "2M",                      // Target bitrate
+                "-maxrate", "2.5M",                // Maximum bitrate
+                "-minrate", "1M",                  // Minimum bitrate
+                "-bufsize", "500k",                // Small buffer for low latency
+                "-undershoot-pct", "95",           // Allow undershooting target
+                "-overshoot-pct", "100",           // Limit overshooting
+                
+                // Quality settings
+                "-qmin", "4",                      // Minimum quantizer (lower = better quality)
+                "-qmax", "48",                     // Maximum quantizer
+                "-crf", "10",                      // Constant rate factor (optional, 4-63)
+                
+                // Keyframe settings
+                "-g", "30",                        // Keyframe every 30 frames
+                "-keyint_min", "30",               // Minimum keyframe interval
+                "-auto-alt-ref", "0",              // Disable alt ref frames for low latency
+                
+                // Frame settings
+                "-r", "30",                        // Frame rate
+                "-pix_fmt", "yuv420p",             // Pixel format
+                
+                // WebM container settings
+                "-f", "ogg",                      // Output format
+                "-page_duration", "10000",        // 10ms page duration (in microseconds)
+                // WebM container settings
                 "-f", "webm",
                 "pipe:1"
             ],
             {
-                "codec": "avc1.640033",
+                "codec": "vp8",
                 "codedWidth": 1920,
                 "codedHeight": 1080,
-                "hardwareAcceleration": "prefer-hardware",
                 "optimizeForLatency": true
             }
         );
+        
     });
 };
 

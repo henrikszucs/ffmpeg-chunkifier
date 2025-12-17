@@ -73,7 +73,7 @@ const Decoder = class {
     // append methods
     appendAudioConfiguration(config) {
         if (this.audioDecoder.state !== "unconfigured") {
-            return;
+            this._createAudioDecoder();
         }
         this.audioConfiguration = config
         this.audioDecoder.configure(this.audioConfiguration);
@@ -101,7 +101,7 @@ const Decoder = class {
 
     appendVideoConfiguration(config) {
         if (this.videoDecoder.state !== "unconfigured") {
-            return;
+            this._createVideoDecoder();
         }
         this.videoConfiguration = config
         this.videoDecoder.configure(this.videoConfiguration);
@@ -119,7 +119,7 @@ const Decoder = class {
         }
         this.videoDecoder.decode(chunk);
 
-           
+        return;
         if (chunk.type === "key") {
             console.log(`Keyframe at ${chunk.timestamp}`);
         } else if (chunk.type === "delta") {
@@ -188,20 +188,43 @@ const Player = class {
         );
 
         // Check the audio format
-        const format = frame.format; // e.g., "f32", "f32-planar", "s16", "s16-planar"
+        const format = frame.format; // e.g., "f32", "f32-planar", "s16", "s16-planar", "u8", "u8-planar"
         if (format.endsWith("-planar")) {
             // Planar format - each channel is in a separate plane
+            const baseFormat = format.replace("-planar", "");
             for (let channel = 0; channel < frame.numberOfChannels; channel++) {
                 const channelData = new Float32Array(frame.numberOfFrames);
-                frame.copyTo(channelData, { "planeIndex": channel });
+                
+                if (baseFormat === "f32") {
+                    frame.copyTo(channelData, { "planeIndex": channel });
+                } else if (baseFormat === "s16") {
+                    const rawData = new Int16Array(frame.numberOfFrames);
+                    frame.copyTo(rawData, { "planeIndex": channel });
+                    for (let i = 0; i < frame.numberOfFrames; i++) {
+                        channelData[i] = rawData[i] / 32768.0;
+                    }
+                } else if (baseFormat === "s32") {
+                    const rawData = new Int32Array(frame.numberOfFrames);
+                    frame.copyTo(rawData, { "planeIndex": channel });
+                    for (let i = 0; i < frame.numberOfFrames; i++) {
+                        channelData[i] = rawData[i] / 2147483648.0;
+                    }
+                } else if (baseFormat === "u8") {
+                    const rawData = new Uint8Array(frame.numberOfFrames);
+                    frame.copyTo(rawData, { "planeIndex": channel });
+                    for (let i = 0; i < frame.numberOfFrames; i++) {
+                        // Convert U8 (0-255, center at 128) to Float32 (-1.0 to 1.0)
+                        channelData[i] = (rawData[i] - 128) / 128.0;
+                    }
+                }
+                
                 audioBuffer.copyToChannel(channelData, channel);
             }
         } else {
             // Interleaved format - all channels are interleaved in plane 0
-            const bytesPerSample = format.startsWith("f32") ? 4 : 2;
             const totalSamples = frame.numberOfFrames * frame.numberOfChannels;
                 
-            if (format.startsWith("f32")) {
+            if (format === "f32") {
                 // Float32 interleaved
                 const interleaved = new Float32Array(totalSamples);
                 frame.copyTo(interleaved, { "planeIndex": 0 });
@@ -213,7 +236,7 @@ const Player = class {
                     }
                     audioBuffer.copyToChannel(channelData, channel);
                 }
-            } else if (format.startsWith("s16")) {
+            } else if (format === "s16") {
                 // Int16 interleaved - need to convert to float
                 const interleaved = new Int16Array(totalSamples);
                 frame.copyTo(interleaved, { "planeIndex": 0 });
@@ -226,7 +249,7 @@ const Player = class {
                     }
                     audioBuffer.copyToChannel(channelData, channel);
                 }
-            } else if (format.startsWith("s32")) {
+            } else if (format === "s32") {
                 // Int32 interleaved
                 const interleaved = new Int32Array(totalSamples);
                 frame.copyTo(interleaved, { "planeIndex": 0 });
@@ -234,6 +257,18 @@ const Player = class {
                     const channelData = new Float32Array(frame.numberOfFrames);
                     for (let i = 0; i < frame.numberOfFrames; i++) {
                         channelData[i] = interleaved[i * frame.numberOfChannels + channel] / 2147483648.0;
+                    }
+                    audioBuffer.copyToChannel(channelData, channel);
+                }
+            } else if (format === "u8") {
+                // Unsigned 8-bit interleaved (common in MP3)
+                const interleaved = new Uint8Array(totalSamples);
+                frame.copyTo(interleaved, { "planeIndex": 0 });
+                for (let channel = 0; channel < frame.numberOfChannels; channel++) {
+                    const channelData = new Float32Array(frame.numberOfFrames);
+                    for (let i = 0; i < frame.numberOfFrames; i++) {
+                        // Convert U8 (0-255, center at 128) to Float32 (-1.0 to 1.0)
+                        channelData[i] = (interleaved[i * frame.numberOfChannels + channel] - 128) / 128.0;
                     }
                     audioBuffer.copyToChannel(channelData, channel);
                 }
@@ -262,7 +297,7 @@ const Player = class {
     };
 
     appendVideoFrame(frame) {
-        this.videoCtx.drawImage(frame, 0, 0, this.videoCtx.canvas.width, this.videoCtx.canvas.height);
+        this.videoDrawCtx.drawImage(frame, 0, 0, this.videoDrawCtx.canvas.width, this.videoDrawCtx.canvas.height);
     };
 
 };
