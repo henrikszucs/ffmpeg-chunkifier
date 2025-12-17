@@ -9,11 +9,11 @@ A Player class that help to play VideoFrame/AudioFrame into the UI.
 ┌─────────────────┐
 │     Encoder     │
 └────────┬────────┘ 
-         │   EncodedVideoChunk / EncodedAudioChunk - transferable objects
+         │   Configuration  /EncodedVideoChunk / EncodedAudioChunk - transferable objects
          ▼
 ┌─────────────────┐
 │     Decoder     │
-└─────────────────┘
+└────────┬────────┘
          │   VideoFrame / AudioFrame
          ▼
 ┌─────────────────┐
@@ -53,6 +53,13 @@ A Player class that help to play VideoFrame/AudioFrame into the UI.
 
 
 ## Usage
+
+### Import
+```js
+const {FFmpegVideoEncoder, FFmpegAudioEncoder} = require("encoder-ffmpeg.js");
+import {BrowserAudioEncoder} from "encoder-browser.js";
+import {Decoder, Player} from "decoder.js";
+```
 
 ### Encoder
 ```js
